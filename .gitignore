@@ -1,0 +1,6 @@
+# Binaries
+**/*.so
+
+# Editor
+.idea
+
