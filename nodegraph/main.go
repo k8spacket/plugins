@@ -5,7 +5,6 @@ import (
 	"github.com/k8spacket/plugins/nodegraph/log"
 	"github.com/k8spacket/plugins/nodegraph/metrics"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph"
-	"net/http"
 )
 
 type stream plugin_api.ReassembledStream
@@ -28,11 +27,7 @@ func (s stream) DistributeTCPPacketPayload(_ plugin_api.TCPPacketPayload) {
 	//silent
 }
 
-func init() {
-	http.HandleFunc("/connections", nodegraph.ConnectionHandler)
-	http.HandleFunc("/api/graph/fields", nodegraph.NodeGraphFieldsHandler)
-	http.HandleFunc("/api/graph/data", nodegraph.NodeGraphDataHandler)
-}
+func init() {}
 
 // exported
 var StreamPlugin stream
