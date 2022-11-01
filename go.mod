@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
-	github.com/k8spacket/k8s-api v1.0.0-alpha
-	github.com/k8spacket/plugin-api v1.0.0-alpha
-	github.com/k8spacket/tls-api v1.0.0-alpha
+	github.com/k8spacket/k8s-api v1.0.0
+	github.com/k8spacket/plugin-api v1.0.0
+	github.com/k8spacket/tls-api v1.0.0
 	github.com/prometheus/client_golang v1.13.0
 )
 
