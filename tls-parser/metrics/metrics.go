@@ -46,7 +46,7 @@ func StoreStreamMetrics(reassembledStream plugin_api.ReassembledStream) {
 			tlsRecord.TLS.Domain,
 			tlsRecord.TLS.UsedTLSVersion,
 			tlsRecord.TLS.UsedCipherSuite).Add(1)
-		var j, _ = json.MarshalIndent(tlsRecord, "", "  ")
+		var j, _ = json.Marshal(tlsRecord)
 		tls_parser_log.LOGGER.Println("TLS Record:", string(j))
 		delete(tlsRecordMap, reassembledStream.StreamId)
 	}
