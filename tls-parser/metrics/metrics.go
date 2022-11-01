@@ -16,14 +16,12 @@ type TLSRecord struct {
 	Dst          string
 	DstName      string
 	DstPort      string
-	Client       struct {
-		Domain       string
-		TlsVersions  []string
-		CipherSuites []string
-	}
-	Server struct {
-		TlsVersion  string
-		CipherSuite string
+	TLS          struct {
+		Domain                string
+		SupportedTLSVersions  []string
+		SupportedCipherSuites []string
+		UsedTLSVersion        string
+		UsedCipherSuite       string
 	}
 }
 
@@ -45,11 +43,11 @@ func StoreStreamMetrics(reassembledStream plugin_api.ReassembledStream) {
 			tlsRecord.Dst,
 			tlsRecord.DstName,
 			tlsRecord.DstPort,
-			tlsRecord.Client.Domain,
-			tlsRecord.Server.TlsVersion,
-			tlsRecord.Server.CipherSuite).Add(1)
+			tlsRecord.TLS.Domain,
+			tlsRecord.TLS.UsedTLSVersion,
+			tlsRecord.TLS.UsedCipherSuite).Add(1)
 		var j, _ = json.MarshalIndent(tlsRecord, "", "  ")
-		tls_parser_log.LOGGER.Println("TLS Record:", j)
+		tls_parser_log.LOGGER.Println("TLS Record:", string(j))
 		delete(tlsRecordMap, reassembledStream.StreamId)
 	}
 }
@@ -63,13 +61,13 @@ func CollectTCPPacketPayload(tcpPacketPayload plugin_api.TCPPacketPayload) {
 	if len(payload) > 5 && payload[0] == model.TLSRecord {
 		if payload[5] == model.ClientHelloTLS {
 			var record = tls_api.ParseTLSPayload(payload).(model.ClientHelloTLSRecord)
-			tlsRecord.Client.Domain = record.ResolvedClientFields.ServerName
-			tlsRecord.Client.TlsVersions = record.ResolvedClientFields.SupportedVersions
-			tlsRecord.Client.CipherSuites = record.ResolvedClientFields.Ciphers
+			tlsRecord.TLS.Domain = record.ResolvedClientFields.ServerName
+			tlsRecord.TLS.SupportedTLSVersions = record.ResolvedClientFields.SupportedVersions
+			tlsRecord.TLS.SupportedCipherSuites = record.ResolvedClientFields.Ciphers
 		} else if payload[5] == model.ServerHelloTLS {
 			var record = tls_api.ParseTLSPayload(payload).(model.ServerHelloTLSRecord)
-			tlsRecord.Server.TlsVersion = record.ResolvedServerFields.SupportedVersion
-			tlsRecord.Server.CipherSuite = record.ResolvedServerFields.Cipher
+			tlsRecord.TLS.UsedTLSVersion = record.ResolvedServerFields.SupportedVersion
+			tlsRecord.TLS.UsedCipherSuite = record.ResolvedServerFields.Cipher
 		}
 		tlsRecordMap[tcpPacketPayload.StreamId] = tlsRecord
 	}
