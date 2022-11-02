@@ -4,71 +4,58 @@ import (
 	"encoding/json"
 	"github.com/k8spacket/plugin-api"
 	tls_parser_log "github.com/k8spacket/plugins/tls-parser/log"
+	"github.com/k8spacket/plugins/tls-parser/metrics/connections"
+	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"github.com/k8spacket/plugins/tls-parser/metrics/prometheus"
 	"github.com/k8spacket/tls-api"
 	"github.com/k8spacket/tls-api/model"
 )
 
-type TLSRecord struct {
-	SrcNamespace string
-	Src          string
-	SrcName      string
-	Dst          string
-	DstName      string
-	DstPort      string
-	TLS          struct {
-		Domain                string
-		SupportedTLSVersions  []string
-		SupportedCipherSuites []string
-		UsedTLSVersion        string
-		UsedCipherSuite       string
-	}
-}
-
-var tlsRecordMap = make(map[uint32]TLSRecord)
+var tlsConnectionMap = make(map[uint32]metrics.TLSConnection)
 
 func StoreStreamMetrics(reassembledStream plugin_api.ReassembledStream) {
-	tlsRecord, ok := tlsRecordMap[reassembledStream.StreamId]
+	tlsConnection, ok := tlsConnectionMap[reassembledStream.StreamId]
 	if ok {
-		tlsRecord.SrcNamespace = reassembledStream.SrcNamespace
-		tlsRecord.Src = reassembledStream.Src
-		tlsRecord.SrcName = reassembledStream.SrcName
-		tlsRecord.Dst = reassembledStream.Dst
-		tlsRecord.DstName = reassembledStream.DstName
-		tlsRecord.DstPort = reassembledStream.DstPort
+		tlsConnection.SrcNamespace = reassembledStream.SrcNamespace
+		tlsConnection.Src = reassembledStream.Src
+		tlsConnection.SrcName = reassembledStream.SrcName
+		tlsConnection.Dst = reassembledStream.Dst
+		tlsConnection.DstName = reassembledStream.DstName
+		tlsConnection.DstPort = reassembledStream.DstPort
 		prometheus.K8sPacketTLSRecordMetric.WithLabelValues(
-			tlsRecord.SrcNamespace,
-			tlsRecord.Src,
-			tlsRecord.SrcName,
-			tlsRecord.Dst,
-			tlsRecord.DstName,
-			tlsRecord.DstPort,
-			tlsRecord.TLS.Domain,
-			tlsRecord.TLS.UsedTLSVersion,
-			tlsRecord.TLS.UsedCipherSuite).Add(1)
-		var j, _ = json.Marshal(tlsRecord)
+			tlsConnection.SrcNamespace,
+			tlsConnection.Src,
+			tlsConnection.SrcName,
+			tlsConnection.Dst,
+			tlsConnection.DstName,
+			tlsConnection.DstPort,
+			tlsConnection.TLS.Domain,
+			tlsConnection.TLS.UsedTLSVersion,
+			tlsConnection.TLS.UsedCipherSuite).Add(1)
+		connections.AddTLSConnection(tlsConnection)
+		var j, _ = json.Marshal(tlsConnection)
 		tls_parser_log.LOGGER.Println("TLS Record:", string(j))
-		delete(tlsRecordMap, reassembledStream.StreamId)
+		delete(tlsConnectionMap, reassembledStream.StreamId)
 	}
 }
 
 func CollectTCPPacketPayload(tcpPacketPayload plugin_api.TCPPacketPayload) {
 	payload := tcpPacketPayload.Payload
-	tlsRecord, ok := tlsRecordMap[tcpPacketPayload.StreamId]
+	tlsConnection, ok := tlsConnectionMap[tcpPacketPayload.StreamId]
 	if !ok {
-		tlsRecord = TLSRecord{}
+		tlsConnection = metrics.TLSConnection{}
 	}
 	if len(payload) > 5 && payload[0] == model.TLSRecord {
 		if payload[5] == model.ClientHelloTLS {
 			var record = tls_api.ParseTLSPayload(payload).(model.ClientHelloTLSRecord)
-			tlsRecord.TLS.Domain = record.ResolvedClientFields.ServerName
-			tlsRecord.TLS.SupportedTLSVersions = record.ResolvedClientFields.SupportedVersions
-			tlsRecord.TLS.SupportedCipherSuites = record.ResolvedClientFields.Ciphers
+			tlsConnection.TLS.Domain = record.ResolvedClientFields.ServerName
+			tlsConnection.TLS.ClientTLSVersions = record.ResolvedClientFields.SupportedVersions
+			tlsConnection.TLS.ClientCipherSuites = record.ResolvedClientFields.Ciphers
 		} else if payload[5] == model.ServerHelloTLS {
 			var record = tls_api.ParseTLSPayload(payload).(model.ServerHelloTLSRecord)
-			tlsRecord.TLS.UsedTLSVersion = record.ResolvedServerFields.SupportedVersion
-			tlsRecord.TLS.UsedCipherSuite = record.ResolvedServerFields.Cipher
+			tlsConnection.TLS.UsedTLSVersion = record.ResolvedServerFields.SupportedVersion
+			tlsConnection.TLS.UsedCipherSuite = record.ResolvedServerFields.Cipher
 		}
-		tlsRecordMap[tcpPacketPayload.StreamId] = tlsRecord
+		tlsConnectionMap[tcpPacketPayload.StreamId] = tlsConnection
 	}
 }
