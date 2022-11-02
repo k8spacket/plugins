@@ -20,10 +20,9 @@ func TLSConnectionHandler(w http.ResponseWriter, _ *http.Request) {
 		values = append(values, v)
 	}
 	tlsConnectionItemsMutex.RUnlock()
-	var response = values
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(response)
+	err := json.NewEncoder(w).Encode(values)
 	if err != nil {
 		panic(err)
 	}
