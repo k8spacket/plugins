@@ -8,16 +8,29 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 )
 
-func TLSParserHandler(w http.ResponseWriter, r *http.Request) {
+func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
+	idParam := strings.TrimPrefix(req.URL.Path, "/api/data/")
+	var id, _ = strconv.Atoi(idParam)
+	if id > 0 {
+		buildResponse(w, req, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), id, req.URL.Query().Encode()))
+	} else {
+		buildResponse(w, req, fmt.Sprintf("http://%%s:%s/tlsparser/connections?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()))
+	}
+
+}
+
+func buildResponse(w http.ResponseWriter, r *http.Request, url string) {
 	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
 
 	var in []metrics.TLSConnection
 	var tlsConnectionItems []metrics.TLSConnection
 
 	for _, ip := range k8spacketIps {
-		resp, err := http.Get(fmt.Sprintf("http://%s:%s/tlsparser/connections?%s", ip, os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), r.URL.Query().Encode()))
+		resp, err := http.Get(fmt.Sprintf(url, ip, os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), r.URL.Query().Encode()))
 
 		if err != nil {
 			fmt.Print(err.Error())
@@ -42,5 +55,4 @@ func TLSParserHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-
 }

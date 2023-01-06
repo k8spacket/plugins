@@ -2,35 +2,31 @@ package connections
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/k8spacket/plugins/tls-parser/metrics/db"
 	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"net/http"
-	"sync"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
-var (
-	tlsConnectionItems      = make(map[string]metrics.TLSConnection)
-	tlsConnectionItemsMutex = sync.RWMutex{}
-)
-
-func TLSConnectionHandler(w http.ResponseWriter, _ *http.Request) {
-	tlsConnectionItemsMutex.RLock()
-	values := make([]metrics.TLSConnection, 0, len(tlsConnectionItems))
-	for _, v := range tlsConnectionItems {
-		values = append(values, v)
+func TLSConnectionHandler(w http.ResponseWriter, req *http.Request) {
+	idParam := strings.TrimPrefix(req.URL.Path, "/tlsparser/connections/")
+	var id, _ = strconv.Atoi(idParam)
+	if id > 0 {
+		w.Header().Set("Content-Type", "application/json")
+		var tlsDetails = db.Read(id, metrics.TLSDetails{})
+		if !reflect.DeepEqual(tlsDetails, metrics.TLSDetails{}) {
+			_ = json.NewEncoder(w).Encode(db.Read(id, metrics.TLSDetails{}))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("Not Found 404"))
+		}
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(db.ReadAll(metrics.TLSConnection{}))
+		if err != nil {
+			panic(err)
+		}
 	}
-	tlsConnectionItemsMutex.RUnlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(values)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func AddTLSConnection(tlsConnection metrics.TLSConnection) {
-	tlsConnectionItemsMutex.Lock()
-	var key = fmt.Sprintf("%s-%s", tlsConnection.Src, tlsConnection.Dst)
-	tlsConnectionItems[key] = tlsConnection
-	tlsConnectionItemsMutex.Unlock()
 }
