@@ -8,20 +8,40 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"reflect"
+	"strings"
 )
 
-func TLSParserHandler(w http.ResponseWriter, r *http.Request) {
+func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
+	idParam := strings.TrimPrefix(req.URL.Path, "/tlsparser/api/data/")
+	if len(strings.TrimSpace(idParam)) > 0 {
+		resultFunc := func(destination, source metrics.TLSDetails) metrics.TLSDetails {
+			if !reflect.DeepEqual(source, metrics.TLSDetails{}) {
+				return source
+			} else {
+				return destination
+			}
+		}
+		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), idParam, req.URL.Query().Encode()), metrics.TLSDetails{}, resultFunc)
+	} else {
+		resultFunc := func(destination, source []metrics.TLSConnection) []metrics.TLSConnection {
+			return append(destination, source...)
+		}
+		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), []metrics.TLSConnection{}, resultFunc)
+	}
+}
+
+func buildResponse[T metrics.TLSDetails | []metrics.TLSConnection](w http.ResponseWriter, url string, t T, resultFunc func(d T, s T) T) {
 	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
 
-	var in []metrics.TLSConnection
-	var tlsConnectionItems []metrics.TLSConnection
+	var in T
+	out := t
 
 	for _, ip := range k8spacketIps {
-		resp, err := http.Get(fmt.Sprintf("http://%s:%s/tlsparser/connections?%s", ip, os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), r.URL.Query().Encode()))
+		resp, err := http.Get(fmt.Sprintf(url, ip))
 
 		if err != nil {
-			fmt.Print(err.Error())
-			os.Exit(1)
+			continue
 		}
 
 		responseData, err := io.ReadAll(resp.Body)
@@ -31,16 +51,12 @@ func TLSParserHandler(w http.ResponseWriter, r *http.Request) {
 
 		err = json.Unmarshal(responseData, &in)
 		if err != nil {
-			panic(err)
+			continue
 		}
 
-		tlsConnectionItems = append(tlsConnectionItems, in...)
+		out = resultFunc(out, in)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(tlsConnectionItems)
-	if err != nil {
-		panic(err)
-	}
-
+	_ = json.NewEncoder(w).Encode(out)
 }
