@@ -2,8 +2,6 @@ module github.com/k8spacket/plugins
 
 go 1.19
 
-replace github.com/k8spacket/tls-api => ../tls-api
-
 require (
 	github.com/HouzuoGuo/tiedot v0.0.0-20210905174726-ae1e16866d06
 	github.com/fatih/structs v1.1.0
@@ -11,7 +9,7 @@ require (
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/k8spacket/k8s-api v1.0.1
 	github.com/k8spacket/plugin-api v1.0.1
-	github.com/k8spacket/tls-api v1.0.1
+	github.com/k8spacket/tls-api v1.1.0-alpha
 	github.com/prometheus/client_golang v1.13.0
 )
 
