@@ -24,9 +24,6 @@ func TLSConnectionHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(db.ReadAll(metrics.TLSConnection{}))
-		if err != nil {
-			panic(err)
-		}
+		_ = json.NewEncoder(w).Encode(db.ReadAll(metrics.TLSConnection{}))
 	}
 }

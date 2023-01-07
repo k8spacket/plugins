@@ -4,11 +4,10 @@ go 1.19
 
 replace github.com/k8spacket/tls-api => ../tls-api
 
-replace github.com/k8spacket/plugin-api => ../plugin-api
-
-replace github.com/k8spacket/k8s-api => ../k8s-api
-
 require (
+	github.com/HouzuoGuo/tiedot v0.0.0-20210905174726-ae1e16866d06
+	github.com/fatih/structs v1.1.0
+	github.com/grantae/certinfo v0.0.0-20170412194111-59d56a35515b
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/k8spacket/k8s-api v1.0.1
 	github.com/k8spacket/plugin-api v1.0.1
@@ -17,12 +16,10 @@ require (
 )
 
 require (
-	github.com/HouzuoGuo/tiedot v0.0.0-20210905174726-ae1e16866d06 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
-	github.com/fatih/structs v1.1.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
@@ -32,7 +29,6 @@ require (
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/grantae/certinfo v0.0.0-20170412194111-59d56a35515b // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

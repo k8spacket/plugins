@@ -8,33 +8,40 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
+	"reflect"
 	"strings"
 )
 
 func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
-	idParam := strings.TrimPrefix(req.URL.Path, "/api/data/")
-	var id, _ = strconv.Atoi(idParam)
-	if id > 0 {
-		buildResponse(w, req, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), id, req.URL.Query().Encode()))
+	idParam := strings.TrimPrefix(req.URL.Path, "/tlsparser/api/data/")
+	if len(strings.TrimSpace(idParam)) > 0 {
+		resultFunc := func(destination, source metrics.TLSDetails) metrics.TLSDetails {
+			if !reflect.DeepEqual(source, metrics.TLSDetails{}) {
+				return source
+			} else {
+				return destination
+			}
+		}
+		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), idParam, req.URL.Query().Encode()), resultFunc)
 	} else {
-		buildResponse(w, req, fmt.Sprintf("http://%%s:%s/tlsparser/connections?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()))
+		resultFunc := func(destination, source []metrics.TLSConnection) []metrics.TLSConnection {
+			return append(destination, source...)
+		}
+		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), resultFunc)
 	}
-
 }
 
-func buildResponse(w http.ResponseWriter, r *http.Request, url string) {
+func buildResponse[T metrics.TLSDetails | []metrics.TLSConnection](w http.ResponseWriter, url string, resultFunc func(d T, s T) T) {
 	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
 
-	var in []metrics.TLSConnection
-	var tlsConnectionItems []metrics.TLSConnection
+	var in T
+	var out T
 
 	for _, ip := range k8spacketIps {
-		resp, err := http.Get(fmt.Sprintf(url, ip, os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), r.URL.Query().Encode()))
+		resp, err := http.Get(fmt.Sprintf(url, ip))
 
 		if err != nil {
-			fmt.Print(err.Error())
-			os.Exit(1)
+			continue
 		}
 
 		responseData, err := io.ReadAll(resp.Body)
@@ -44,15 +51,17 @@ func buildResponse(w http.ResponseWriter, r *http.Request, url string) {
 
 		err = json.Unmarshal(responseData, &in)
 		if err != nil {
-			panic(err)
+			continue
 		}
 
-		tlsConnectionItems = append(tlsConnectionItems, in...)
+		out = resultFunc(out, in)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(tlsConnectionItems)
-	if err != nil {
-		panic(err)
+	if !reflect.ValueOf(out).IsZero() {
+		_ = json.NewEncoder(w).Encode(out)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Not Found 404"))
 	}
 }
