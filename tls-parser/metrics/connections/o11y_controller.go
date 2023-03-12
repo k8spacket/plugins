@@ -12,8 +12,17 @@ import (
 	"strings"
 )
 
+const connectionDetailsUri = "/tlsparser/api/data/"
+
 func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
-	idParam := strings.TrimPrefix(req.URL.Path, "/tlsparser/api/data/")
+	resultFunc := func(destination, source []metrics.TLSConnection) []metrics.TLSConnection {
+		return append(destination, source...)
+	}
+	buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), []metrics.TLSConnection{}, resultFunc)
+}
+
+func TLSParserConnectionDetailsHandler(w http.ResponseWriter, req *http.Request) {
+	idParam := strings.TrimPrefix(req.URL.Path, connectionDetailsUri)
 	if len(strings.TrimSpace(idParam)) > 0 {
 		resultFunc := func(destination, source metrics.TLSDetails) metrics.TLSDetails {
 			if !reflect.DeepEqual(source, metrics.TLSDetails{}) {
@@ -24,10 +33,7 @@ func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), idParam, req.URL.Query().Encode()), metrics.TLSDetails{}, resultFunc)
 	} else {
-		resultFunc := func(destination, source []metrics.TLSConnection) []metrics.TLSConnection {
-			return append(destination, source...)
-		}
-		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), []metrics.TLSConnection{}, resultFunc)
+		TLSParserConnectionsHandler(w, req)
 	}
 }
 
