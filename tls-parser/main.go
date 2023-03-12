@@ -14,7 +14,8 @@ func (s stream) InitPlugin(manager plugin_api.PluginManager) {
 	tls_parser_log.BuildLogger()
 	manager.RegisterPlugin(s)
 	manager.RegisterHttpHandler("/tlsparser/connections/", connections.TLSConnectionHandler)
-	manager.RegisterHttpHandler("/tlsparser/api/data/", connections.TLSParserConnectionsHandler)
+	manager.RegisterHttpHandler("/tlsparser/api/data", connections.TLSParserConnectionsHandler)
+	manager.RegisterHttpHandler("/tlsparser/api/data/", connections.TLSParserConnectionDetailsHandler)
 }
 
 func (s stream) DistributeReassembledStream(reassembledStream plugin_api.ReassembledStream) {
