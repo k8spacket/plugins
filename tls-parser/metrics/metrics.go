@@ -3,70 +3,102 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/k8spacket/plugin-api/v2"
-	"github.com/k8spacket/plugins/idb"
+	"github.com/grantae/certinfo"
+	"github.com/k8spacket/plugin-api"
 	tls_parser_log "github.com/k8spacket/plugins/tls-parser/log"
-	"github.com/k8spacket/plugins/tls-parser/metrics/certificate"
-	tls_connection_db "github.com/k8spacket/plugins/tls-parser/metrics/db/tls_connection"
-	tls_detail_db "github.com/k8spacket/plugins/tls-parser/metrics/db/tls_detail"
-	"github.com/k8spacket/plugins/tls-parser/metrics/dict"
+	"github.com/k8spacket/plugins/tls-parser/metrics/db"
 	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"github.com/k8spacket/plugins/tls-parser/metrics/prometheus"
-	"strconv"
+	"github.com/k8spacket/tls-api"
+	"github.com/k8spacket/tls-api/model"
+	"hash/fnv"
+	"reflect"
+	"strings"
 )
 
-func StoreTLSMetrics(tlsEvent plugin_api.TLSEvent) {
-	tlsConnection := model.TLSConnection{
-		Src:             tlsEvent.Client.Addr,
-		SrcName:         tlsEvent.Client.Name,
-		SrcNamespace:    tlsEvent.Client.Namespace,
-		Dst:             tlsEvent.Server.Addr,
-		DstName:         tlsEvent.Server.Name,
-		DstPort:         tlsEvent.Server.Port,
-		Domain:          tlsEvent.ServerName,
-		UsedTLSVersion:  dict.ParseTLSVersion(tlsEvent.UsedTlsVersion),
-		UsedCipherSuite: dict.ParseCipherSuite(tlsEvent.UsedCipher)}
+var tlsConnectionMap = make(map[uint32]metrics.TLSConnection)
+var tlsDetailsMap = make(map[uint32]metrics.TLSDetails)
 
-	tlsDetails := model.TLSDetails{
-		Domain:          tlsEvent.ServerName,
-		Dst:             tlsEvent.Server.Addr,
-		Port:            tlsEvent.Server.Port,
-		UsedTLSVersion:  dict.ParseTLSVersion(tlsEvent.UsedTlsVersion),
-		UsedCipherSuite: dict.ParseCipherSuite(tlsEvent.UsedCipher)}
-
-	for _, tlsVersion := range tlsEvent.TlsVersions {
-		tlsDetails.ClientTLSVersions = append(tlsDetails.ClientTLSVersions, dict.ParseTLSVersion(tlsVersion))
+func StoreStreamMetrics(reassembledStream plugin_api.ReassembledStream) {
+	tlsConnection, ok := tlsConnectionMap[reassembledStream.StreamId]
+	if ok {
+		tlsConnection.SrcNamespace = reassembledStream.SrcNamespace
+		tlsConnection.Src = reassembledStream.Src
+		tlsConnection.SrcName = reassembledStream.SrcName
+		tlsConnection.Dst = reassembledStream.Dst
+		tlsConnection.DstName = reassembledStream.DstName
+		tlsConnection.DstPort = reassembledStream.DstPort
+		prometheus.K8sPacketTLSRecordMetric.WithLabelValues(
+			tlsConnection.SrcNamespace,
+			tlsConnection.Src,
+			tlsConnection.SrcName,
+			tlsConnection.Dst,
+			tlsConnection.DstName,
+			tlsConnection.DstPort,
+			tlsConnection.Domain,
+			tlsConnection.UsedTLSVersion,
+			tlsConnection.UsedCipherSuite).Add(1)
+		tlsDetails, _ := tlsDetailsMap[reassembledStream.StreamId]
+		storeInDatabase(tlsConnection, tlsDetails)
+		var j, _ = json.Marshal(tlsConnection)
+		tls_parser_log.LOGGER.Println("TLS Record:", string(j))
+		delete(tlsConnectionMap, reassembledStream.StreamId)
+		delete(tlsDetailsMap, reassembledStream.StreamId)
 	}
-	for _, cipher := range tlsEvent.Ciphers {
-		tlsDetails.ClientCipherSuites = append(tlsDetails.ClientCipherSuites, dict.ParseCipherSuite(cipher))
-	}
-
-	storeInDatabase(&tlsConnection, &tlsDetails)
-
-	prometheus.K8sPacketTLSRecordMetric.WithLabelValues(
-		tlsConnection.SrcNamespace,
-		tlsConnection.Src,
-		tlsConnection.SrcName,
-		tlsConnection.Dst,
-		tlsConnection.DstName,
-		strconv.Itoa(int(tlsConnection.DstPort)),
-		tlsConnection.Domain,
-		tlsConnection.UsedTLSVersion,
-		tlsConnection.UsedCipherSuite).Add(1)
-
-	prometheus.K8sPacketTLSCertificateExpirationCounterMetric.WithLabelValues(
-		tlsDetails.Dst,
-		strconv.Itoa(int(tlsDetails.Port)),
-		tlsDetails.Domain).Add(1)
-
-	var j, _ = json.Marshal(tlsConnection)
-	tls_parser_log.LOGGER.Println("TLS Record:", string(j))
 }
 
-func storeInDatabase(tlsConnection *model.TLSConnection, tlsDetails *model.TLSDetails) {
-	var id = strconv.Itoa(int(idb.HashId(fmt.Sprintf("%s-%s", tlsConnection.Src, tlsConnection.Dst))))
+func CollectTCPPacketPayload(streamId uint32, payload []byte) {
+	tlsConnection, ok := tlsConnectionMap[streamId]
+	if !ok {
+		tlsConnection = metrics.TLSConnection{}
+		tlsConnection.StreamId = streamId
+	}
+	tlsDetails, ok := tlsDetailsMap[streamId]
+	if !ok {
+		tlsDetails = metrics.TLSDetails{}
+		tlsDetails.StreamId = streamId
+	}
+	var tlsWrapper = tls_api.ParseTLSPayload(payload)
+	if !reflect.DeepEqual(tlsWrapper.ClientHelloTLSRecord, model.ClientHelloTLSRecord{}) {
+		var record = tlsWrapper.ClientHelloTLSRecord
+		tlsConnection.Domain = record.ResolvedClientFields.ServerName
+		tlsDetails.Domain = record.ResolvedClientFields.ServerName
+		tlsDetails.ClientTLSVersions = record.ResolvedClientFields.SupportedVersions
+		tlsDetails.ClientCipherSuites = record.ResolvedClientFields.Ciphers
+	}
+	if !reflect.DeepEqual(tlsWrapper.ServerHelloTLSRecord, model.ServerHelloTLSRecord{}) {
+		var record = tlsWrapper.ServerHelloTLSRecord
+		tlsConnection.UsedTLSVersion = record.ResolvedServerFields.SupportedVersion
+		tlsConnection.UsedCipherSuite = record.ResolvedServerFields.Cipher
+		tlsDetails.UsedTLSVersion = record.ResolvedServerFields.SupportedVersion
+		tlsDetails.UsedCipherSuite = record.ResolvedServerFields.Cipher
+		if tlsDetails.UsedTLSVersion == model.GetTLSVersion(0x0304) {
+			tlsDetails.ServerChain = "ENCRYPTED"
+		}
+	}
+	if !reflect.DeepEqual(tlsWrapper.CertificateTLSRecord, model.CertificateTLSRecord{}) {
+		var record = tlsWrapper.CertificateTLSRecord
+		tlsDetails.ServerChain = ""
+		for _, cert := range record.Certificates {
+			var certString, _ = certinfo.CertificateText(&cert)
+			certString = strings.Replace(certString, "\n\n", "\n", -1)
+			tlsDetails.ServerChain += certString
+		}
+	}
+	tlsConnectionMap[streamId] = tlsConnection
+	tlsDetailsMap[streamId] = tlsDetails
+}
+
+func storeInDatabase(tlsConnection metrics.TLSConnection, tlsDetails metrics.TLSDetails) {
+	var id = hash(fmt.Sprintf("%s-%s", tlsConnection.Src, tlsConnection.Dst))
 	tlsConnection.Id = id
-	tls_connection_db.Upsert(id, tlsConnection)
+	db.Insert(int(id), tlsConnection)
 	tlsDetails.Id = id
-	tls_detail_db.Upsert(id, tlsDetails, certificate.UpdateCertificateInfo)
+	db.Insert(int(id), tlsDetails)
+}
+
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
 }

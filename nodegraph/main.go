@@ -1,29 +1,33 @@
 package main
 
 import (
-	"github.com/k8spacket/plugin-api/v2"
+	"github.com/k8spacket/plugin-api"
 	"github.com/k8spacket/plugins/nodegraph/log"
 	"github.com/k8spacket/plugins/nodegraph/metrics"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph"
 )
 
-type event plugin_api.TCPEvent
+type stream plugin_api.ReassembledStream
 
-func (e event) InitPlugin(manager plugin_api.PluginManager) {
+func (s stream) InitPlugin(manager plugin_api.PluginManager) {
 	nodegraph_log.BuildLogger()
 
-	manager.RegisterTCPPlugin(e)
+	manager.RegisterPlugin(s)
 	manager.RegisterHttpHandler("/nodegraph/connections", nodegraph.ConnectionHandler)
 	manager.RegisterHttpHandler("/nodegraph/api/health", nodegraph.Health)
 	manager.RegisterHttpHandler("/nodegraph/api/graph/fields", nodegraph.NodeGraphFieldsHandler)
 	manager.RegisterHttpHandler("/nodegraph/api/graph/data", nodegraph.NodeGraphDataHandler)
 }
 
-func (e event) DistributeTCPEvent(event plugin_api.TCPEvent) {
-	metrics.StoreNodegraphMetric(event)
+func (s stream) DistributeReassembledStream(reassembledStream plugin_api.ReassembledStream) {
+	metrics.StoreNodegraphMetric(reassembledStream)
+}
+
+func (s stream) DistributeTCPPacketPayload(_ plugin_api.TCPPacketPayload) {
+	//silent
 }
 
 func init() {}
 
 // exported
-var TCPConsumerPlugin event
+var StreamPlugin stream

@@ -3,8 +3,7 @@ package connections
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/k8spacket/k8s-api/v2"
-	tls_parser_log "github.com/k8spacket/plugins/tls-parser/log"
+	"github.com/k8spacket/k8s-api"
 	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"io"
 	"net/http"
@@ -16,29 +15,29 @@ import (
 const connectionDetailsUri = "/tlsparser/api/data/"
 
 func TLSParserConnectionsHandler(w http.ResponseWriter, req *http.Request) {
-	resultFunc := func(destination, source []model.TLSConnection) []model.TLSConnection {
+	resultFunc := func(destination, source []metrics.TLSConnection) []metrics.TLSConnection {
 		return append(destination, source...)
 	}
-	buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), []model.TLSConnection{}, resultFunc)
+	buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), req.URL.Query().Encode()), []metrics.TLSConnection{}, resultFunc)
 }
 
 func TLSParserConnectionDetailsHandler(w http.ResponseWriter, req *http.Request) {
 	idParam := strings.TrimPrefix(req.URL.Path, connectionDetailsUri)
 	if len(strings.TrimSpace(idParam)) > 0 {
-		resultFunc := func(destination, source model.TLSDetails) model.TLSDetails {
-			if !reflect.DeepEqual(source, model.TLSDetails{}) {
+		resultFunc := func(destination, source metrics.TLSDetails) metrics.TLSDetails {
+			if !reflect.DeepEqual(source, metrics.TLSDetails{}) {
 				return source
 			} else {
 				return destination
 			}
 		}
-		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), idParam, req.URL.Query().Encode()), model.TLSDetails{}, resultFunc)
+		buildResponse(w, fmt.Sprintf("http://%%s:%s/tlsparser/connections/%s?%s", os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), idParam, req.URL.Query().Encode()), metrics.TLSDetails{}, resultFunc)
 	} else {
 		TLSParserConnectionsHandler(w, req)
 	}
 }
 
-func buildResponse[T model.TLSDetails | []model.TLSConnection](w http.ResponseWriter, url string, t T, resultFunc func(d T, s T) T) {
+func buildResponse[T metrics.TLSDetails | []metrics.TLSConnection](w http.ResponseWriter, url string, t T, resultFunc func(d T, s T) T) {
 	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
 
 	var in T
@@ -48,29 +47,22 @@ func buildResponse[T model.TLSDetails | []model.TLSConnection](w http.ResponseWr
 		resp, err := http.Get(fmt.Sprintf(url, ip))
 
 		if err != nil {
-			tls_parser_log.LOGGER.Printf("[api] Cannot get stats: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			continue
 		}
 
 		responseData, err := io.ReadAll(resp.Body)
 		if err != nil {
-			tls_parser_log.LOGGER.Printf("[api] Cannot read stats response: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		_ = json.Unmarshal(responseData, &in)
+		err = json.Unmarshal(responseData, &in)
 		if err != nil {
-			tls_parser_log.LOGGER.Printf("[api] Cannot parse stats response: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			continue
 		}
 
 		out = resultFunc(out, in)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(out)
-	if err != nil {
-		tls_parser_log.LOGGER.Printf("[api] Cannot prepare stats response: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	_ = json.NewEncoder(w).Encode(out)
 }

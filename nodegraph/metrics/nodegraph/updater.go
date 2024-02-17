@@ -1,30 +1,24 @@
 package nodegraph
 
 import (
-	"fmt"
-	"github.com/k8spacket/plugins/idb"
-	tcp_connection_db "github.com/k8spacket/plugins/nodegraph/metrics/db/tcp_connection"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/model"
-	"strconv"
 	"sync"
 )
 
-var connectionItemsMutex = sync.RWMutex{}
+var (
+	connectionItems      = make(map[string]model.ConnectionItem)
+	connectionItemsMutex = sync.RWMutex{}
+)
 
-func UpdateNodeGraph(src string, srcName string, srcNamespace string, dst string, dstName string, dstNamespace string, persistent bool, bytesSent float64, bytesReceived float64, duration float64) {
+func UpdateNodeGraph(src string, srcName string, srcNamespace string, dst string, dstName string, dstNamespace string, closed bool, bytesSent float64, bytesReceived float64, duration float64) {
 	connectionItemsMutex.Lock()
-	var id = strconv.Itoa(int(idb.HashId(fmt.Sprintf("%s-%s", src, dst))))
-	var connection = tcp_connection_db.Read(id)
+	var connection = connectionItems[src+"-"+dst]
 	if (model.ConnectionItem{} == connection) {
-		connection = *&model.ConnectionItem{Src: src, Dst: dst}
+		connection = *&model.ConnectionItem{src, srcName, srcNamespace, dst, dstName, dstNamespace, 0, 0, 0, 0, 0, 0}
 	}
-	connection.SrcName = srcName
-	connection.SrcNamespace = srcNamespace
-	connection.DstName = dstName
-	connection.DstNamespace = dstNamespace
 	connection.ConnCount++
-	if persistent {
-		connection.ConnPersistent++
+	if closed {
+		connection.ConnClosed++
 	}
 	connection.BytesSent += bytesSent
 	connection.BytesReceived += bytesReceived
@@ -32,6 +26,6 @@ func UpdateNodeGraph(src string, srcName string, srcNamespace string, dst string
 	if duration > connection.MaxDuration {
 		connection.MaxDuration = duration
 	}
-	tcp_connection_db.Set(id, &connection)
+	connectionItems[src+"-"+dst] = connection
 	connectionItemsMutex.Unlock()
 }

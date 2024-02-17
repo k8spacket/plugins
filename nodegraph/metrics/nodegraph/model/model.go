@@ -1,30 +1,30 @@
 package model
 
 type ConnectionItem struct {
-	Src            string  `json:"src"`
-	SrcName        string  `json:"srcName"`
-	SrcNamespace   string  `json:"srcNamespace"`
-	Dst            string  `json:"dst"`
-	DstName        string  `json:"dstName"`
-	DstNamespace   string  `json:"dstNamespace"`
-	ConnCount      int64   `json:"connCount"`
-	ConnPersistent int64   `json:"connPersistent"`
-	BytesSent      float64 `json:"bytesSent"`
-	BytesReceived  float64 `json:"bytesReceived"`
-	Duration       float64 `json:"duration"`
-	MaxDuration    float64 `json:"maxDuration"`
+	Src           string  `json:"src"`
+	SrcName       string  `json:"srcName"`
+	SrcNamespace  string  `json:"srcNamespace"`
+	Dst           string  `json:"dst"`
+	DstName       string  `json:"dstName"`
+	DstNamespace  string  `json:"dstNamespace"`
+	ConnCount     int64   `json:"connCount"`
+	ConnClosed    int64   `json:"connClosed"`
+	BytesSent     float64 `json:"bytesSent"`
+	BytesReceived float64 `json:"bytesReceived"`
+	Duration      float64 `json:"duration"`
+	MaxDuration   float64 `json:"maxDuration"`
 }
 
 type ConnectionEndpoint struct {
-	Ip             string
-	Name           string
-	Namespace      string
-	ConnCount      int64
-	ConnPersistent int64
-	BytesSent      float64
-	BytesReceived  float64
-	Duration       float64
-	MaxDuration    float64
+	Ip            string
+	Name          string
+	Namespace     string
+	ConnCount     int64
+	ConnClosed    int64
+	BytesSent     float64
+	BytesReceived float64
+	Duration      float64
+	MaxDuration   float64
 }
 
 type NodeGraph struct {

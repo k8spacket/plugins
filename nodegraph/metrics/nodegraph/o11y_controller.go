@@ -3,8 +3,7 @@ package nodegraph
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/k8spacket/k8s-api/v2"
-	nodegraph_log "github.com/k8spacket/plugins/nodegraph/log"
+	"github.com/k8spacket/k8s-api"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/model"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/stats"
 	"io"
@@ -21,7 +20,7 @@ func Health(w http.ResponseWriter, _ *http.Request) {
 func NodeGraphFieldsHandler(w http.ResponseWriter, r *http.Request) {
 	jsonFile, err := os.ReadFile("fields.json")
 	if err != nil {
-		nodegraph_log.LOGGER.Print(err.Error())
+		fmt.Print(err.Error())
 		os.Exit(1)
 	}
 
@@ -54,20 +53,18 @@ func NodeGraphDataHandler(w http.ResponseWriter, r *http.Request) {
 		resp, err := http.Get(fmt.Sprintf("http://%s:%s/nodegraph/connections?%s", ip, os.Getenv("K8S_PACKET_TCP_LISTENER_PORT"), r.URL.Query().Encode()))
 
 		if err != nil {
-			nodegraph_log.LOGGER.Printf("[api] Cannot get stats: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Print(err.Error())
+			os.Exit(1)
 		}
 
 		responseData, err := io.ReadAll(resp.Body)
 		if err != nil {
-			nodegraph_log.LOGGER.Printf("[api] Cannot read stats response: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		err = json.Unmarshal(responseData, &in)
 		if err != nil {
-			nodegraph_log.LOGGER.Printf("[api] Cannot parse stats response: %+v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			panic(err)
 		}
 
 		for index, element := range in {
@@ -97,7 +94,7 @@ func prepareConnections(connectionItems map[string]model.ConnectionItem, connect
 			connEndpointDst = *&model.ConnectionEndpoint{conn.Dst, conn.DstName, conn.DstNamespace, 0, 0, 0, 0, 0, 0}
 		}
 		connEndpointDst.ConnCount += conn.ConnCount
-		connEndpointDst.ConnPersistent += conn.ConnPersistent
+		connEndpointDst.ConnClosed += conn.ConnClosed
 		connEndpointDst.BytesSent += conn.BytesReceived
 		connEndpointDst.BytesReceived += conn.BytesSent
 		connEndpointDst.Duration += conn.Duration
@@ -129,8 +126,7 @@ func buildApiResponse(w http.ResponseWriter, connectionItems map[string]model.Co
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		nodegraph_log.LOGGER.Printf("[api] Cannot prepare stats response: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		panic(err)
 	}
 }
 
