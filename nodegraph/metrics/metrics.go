@@ -1,27 +1,45 @@
 package metrics
 
 import (
-	"github.com/k8spacket/plugin-api"
+	"github.com/k8spacket/plugin-api/v2"
 	"github.com/k8spacket/plugins/nodegraph/log"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph"
 	"github.com/k8spacket/plugins/nodegraph/metrics/prometheus"
 	"os"
 	"strconv"
+	"time"
 )
 
-func StoreNodegraphMetric(stream plugin_api.ReassembledStream) {
+func StoreNodegraphMetric(event plugin_api.TCPEvent) {
 	hideSrcPort, _ := strconv.ParseBool(os.Getenv("K8S_PACKET_HIDE_SRC_PORT"))
-	var srcPortMetrics = stream.SrcPort
+	var srcPortMetrics = strconv.Itoa(int(event.Client.Port))
 	if hideSrcPort {
 		srcPortMetrics = "dynamic"
 	}
 
-	prometheus.K8sPacketBytesSentMetric.WithLabelValues(stream.SrcNamespace, stream.Src, stream.SrcName, srcPortMetrics, stream.Dst, stream.DstName, stream.DstPort, strconv.FormatBool(stream.Closed)).Observe(stream.BytesSent)
-	prometheus.K8sPacketBytesReceivedMetric.WithLabelValues(stream.SrcNamespace, stream.Src, stream.SrcName, srcPortMetrics, stream.Dst, stream.DstName, stream.DstPort, strconv.FormatBool(stream.Closed)).Observe(stream.BytesReceived)
-	prometheus.K8sPacketDurationSecondsMetric.WithLabelValues(stream.SrcNamespace, stream.Src, stream.SrcName, srcPortMetrics, stream.Dst, stream.DstName, stream.DstPort, strconv.FormatBool(stream.Closed)).Observe(stream.Duration)
+	var persistent = false
+	var persistentDuration, _ = time.ParseDuration(os.Getenv("K8S_PACKET_TCP_PERSISTENT_DURATION"))
+	if int(event.DeltaUs) > int(persistentDuration.Milliseconds()) {
+		persistent = true
+	}
 
-	nodegraph.UpdateNodeGraph(stream.Src, stream.SrcName, stream.SrcNamespace, stream.Dst, stream.DstName, stream.DstNamespace, stream.Closed, stream.BytesSent, stream.BytesReceived, stream.Duration)
+	prometheus.K8sPacketBytesSentMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.TxB))
+	prometheus.K8sPacketBytesReceivedMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.RxB))
+	prometheus.K8sPacketDurationSecondsMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.DeltaUs))
 
-	nodegraph_log.LOGGER.Printf("Connection: src=%v srcName=%v srcPort=%v srcNS=%v dst=%v dstName=%v dstPort=%v dstNS=%v closed=%v bytesSent=%v bytesReceived=%v duration=%v",
-		stream.Src, stream.SrcName, stream.SrcPort, stream.SrcNamespace, stream.Dst, stream.DstName, stream.DstPort, stream.DstNamespace, stream.Closed, stream.BytesSent, stream.BytesReceived, stream.Duration)
+	nodegraph.UpdateNodeGraph(event.Client.Addr, event.Client.Name, event.Client.Namespace, event.Server.Addr, event.Server.Name, event.Server.Namespace, persistent, float64(event.TxB), float64(event.RxB), float64(event.DeltaUs))
+
+	nodegraph_log.LOGGER.Printf("Connection: src=%v srcName=%v srcPort=%v srcNS=%v dst=%v dstName=%v dstPort=%v dstNS=%v persistent=%v bytesSent=%v bytesReceived=%v duration=%v",
+		event.Client.Addr,
+		event.Client.Name,
+		strconv.Itoa(int(event.Client.Port)),
+		event.Client.Namespace,
+		event.Server.Addr,
+		event.Server.Name,
+		strconv.Itoa(int(event.Server.Port)),
+		event.Server.Namespace,
+		persistent,
+		float64(event.TxB),
+		float64(event.RxB),
+		float64(event.DeltaUs))
 }

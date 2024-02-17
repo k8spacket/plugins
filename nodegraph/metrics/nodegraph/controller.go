@@ -2,6 +2,8 @@ package nodegraph
 
 import (
 	"encoding/json"
+	nodegraph_log "github.com/k8spacket/plugins/nodegraph/log"
+	tcp_connection_db "github.com/k8spacket/plugins/nodegraph/metrics/db/tcp_connection"
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/model"
 	"net/http"
 	"net/url"
@@ -16,7 +18,8 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		panic(err)
+		nodegraph_log.LOGGER.Printf("[api] Cannot prepare connections response: %+v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -41,7 +44,7 @@ func filterConnections(query url.Values) map[string]model.ConnectionItem {
 
 	var filteredConnectionItems = make(map[string]model.ConnectionItem)
 
-	for _, conn := range connectionItems {
+	for _, conn := range tcp_connection_db.ReadAll() {
 		var matchSrc, _ = regexp.Match(patternNs, []byte(conn.SrcNamespace))
 		var matchDst, _ = regexp.Match(patternNs, []byte(conn.DstNamespace))
 
