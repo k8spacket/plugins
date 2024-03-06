@@ -1,45 +1,35 @@
 package idb
 
 import (
-	"encoding/json"
 	"fmt"
 	tcp_model "github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/model"
 	tls_model "github.com/k8spacket/plugins/tls-parser/metrics/model"
+	"github.com/timshannon/bolthold"
 	"go.etcd.io/bbolt"
 	"hash/fnv"
 )
 
-var BUCKET = []byte("bucket")
-
 type DB[T tls_model.TLSDetails | tls_model.TLSConnection | tcp_model.ConnectionItem] struct {
-	db *bbolt.DB
+	store *bolthold.Store
 }
 
 func StartDB[T tls_model.TLSDetails | tls_model.TLSConnection | tcp_model.ConnectionItem](dbname string) (*DB[T], error) {
 
-	database, err := bbolt.Open(fmt.Sprintf("%s.db", dbname), 0600, nil)
+	database, err := bolthold.Open(fmt.Sprintf("%s.db", dbname), 0600, nil)
 	if err != nil {
 		return nil, err
 	}
-	database.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucket(BUCKET)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
 	return &DB[T]{database}, nil
 }
 
 func (k *DB[T]) Close() error {
-	return k.db.Close()
+	return k.store.Close()
 }
 
 func (k *DB[T]) Read(key string) (T, error) {
 	var value T
-	return value, k.db.View(func(tx *bbolt.Tx) error {
-		item := tx.Bucket(BUCKET).Get([]byte(key))
-		err := json.Unmarshal(item, &value)
+	return value, k.store.Bolt().View(func(tx *bbolt.Tx) error {
+		err := k.store.TxGet(tx, key, &value)
 		if err != nil {
 			return err
 		}
@@ -47,32 +37,21 @@ func (k *DB[T]) Read(key string) (T, error) {
 	})
 }
 
-func (k *DB[T]) ReadAll() ([]T, error) {
+func (k *DB[T]) Query(query *bolthold.Query) ([]T, error) {
 	var value []T
-	return value, k.db.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(BUCKET)
-		c := b.Cursor()
-		for key, val := c.First(); key != nil; key, val = c.Next() {
-			var obj T
-			err := json.Unmarshal(val, &obj)
-			if err != nil {
-				return err
-			}
-			value = append(value, obj)
+	return value, k.store.Bolt().View(func(tx *bbolt.Tx) error {
+		err := k.store.TxFind(tx, &value, query)
+		if err != nil {
+			return err
 		}
-
 		return nil
 	})
 }
 
 func (k *DB[T]) Upsert(key string, value T) error {
-	return k.db.Update(
+	return k.store.Bolt().Update(
 		func(tx *bbolt.Tx) error {
-			val, err := json.Marshal(value)
-			if err != nil {
-				return err
-			}
-			return tx.Bucket(BUCKET).Put([]byte(key), val)
+			return k.store.TxUpsert(tx, key, value)
 		})
 }
 

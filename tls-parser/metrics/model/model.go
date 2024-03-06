@@ -5,16 +5,17 @@ import (
 )
 
 type TLSConnection struct {
-	Id              string `json:"id"`
-	Src             string `json:"src"`
-	SrcName         string `json:"srcName"`
-	SrcNamespace    string `json:"srcNamespace"`
-	Dst             string `json:"dst"`
-	DstName         string `json:"dstName"`
-	DstPort         uint16 `json:"dstPort"`
-	Domain          string `json:"domain"`
-	UsedTLSVersion  string `json:"usedTLSVersion"`
-	UsedCipherSuite string `json:"usedCipherSuite"`
+	Id              string    `json:"id"`
+	Src             string    `json:"src"`
+	SrcName         string    `json:"srcName"`
+	SrcNamespace    string    `json:"srcNamespace"`
+	Dst             string    `json:"dst"`
+	DstName         string    `json:"dstName"`
+	DstPort         uint16    `json:"dstPort"`
+	Domain          string    `json:"domain"`
+	UsedTLSVersion  string    `json:"usedTLSVersion"`
+	UsedCipherSuite string    `json:"usedCipherSuite"`
+	LastSeen        time.Time `json:"lastSeen"`
 }
 
 type Certificate struct {

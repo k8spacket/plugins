@@ -8,6 +8,7 @@ require (
 	github.com/k8spacket/k8s-api/v2 v2.0.0
 	github.com/k8spacket/plugin-api/v2 v2.0.0
 	github.com/prometheus/client_golang v1.18.0
+	github.com/timshannon/bolthold v0.0.0-20231129192944-dca5178aa629
 	go.etcd.io/bbolt v1.3.8
 )
 

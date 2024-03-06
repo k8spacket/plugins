@@ -7,8 +7,11 @@ import (
 	tls_detail_db "github.com/k8spacket/plugins/tls-parser/metrics/db/tls_detail"
 	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"net/http"
+	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func TLSConnectionHandler(w http.ResponseWriter, req *http.Request) {
@@ -28,10 +31,35 @@ func TLSConnectionHandler(w http.ResponseWriter, req *http.Request) {
 		}
 	} else {
 		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(tls_connection_db.ReadAll())
+		err := json.NewEncoder(w).Encode(filterConnections(req.URL.Query()))
 		if err != nil {
 			tls_parser_log.LOGGER.Printf("[api] Cannot prepare connections response: %+v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+}
+
+func filterConnections(query url.Values) []model.TLSConnection {
+	var from = query["from"]
+	var rangeFrom = time.Time{}
+	if len(from) > 0 {
+		i, err := strconv.ParseInt(from[0], 10, 64)
+		if err != nil {
+			tls_parser_log.LOGGER.Printf("[api] parse: %+v", err)
+		}
+		rangeFrom = time.UnixMilli(i)
+	}
+
+	var to = query["to"]
+	var rangeTo = time.Time{}
+	if len(to) > 0 {
+		i, err := strconv.ParseInt(to[0], 10, 64)
+		if err != nil {
+			tls_parser_log.LOGGER.Printf("[api] parse: %+v", err)
+		}
+		rangeTo = time.UnixMilli(i)
+	}
+
+	tls_parser_log.LOGGER.Printf("[api:params] from: %s, to: %s", rangeFrom, rangeTo)
+	return tls_connection_db.Query(rangeFrom, rangeTo)
 }
