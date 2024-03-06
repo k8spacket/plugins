@@ -11,11 +11,6 @@ import (
 )
 
 func StoreNodegraphMetric(event plugin_api.TCPEvent) {
-	hideSrcPort, _ := strconv.ParseBool(os.Getenv("K8S_PACKET_HIDE_SRC_PORT"))
-	var srcPortMetrics = strconv.Itoa(int(event.Client.Port))
-	if hideSrcPort {
-		srcPortMetrics = "dynamic"
-	}
 
 	var persistent = false
 	var persistentDuration, _ = time.ParseDuration(os.Getenv("K8S_PACKET_TCP_PERSISTENT_DURATION"))
@@ -23,9 +18,7 @@ func StoreNodegraphMetric(event plugin_api.TCPEvent) {
 		persistent = true
 	}
 
-	prometheus.K8sPacketBytesSentMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.TxB))
-	prometheus.K8sPacketBytesReceivedMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.RxB))
-	prometheus.K8sPacketDurationSecondsMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.DeltaUs))
+	sendPrometheusMetrics(event, persistent)
 
 	nodegraph.UpdateNodeGraph(event.Client.Addr, event.Client.Name, event.Client.Namespace, event.Server.Addr, event.Server.Name, event.Server.Namespace, persistent, float64(event.TxB), float64(event.RxB), float64(event.DeltaUs))
 
@@ -42,4 +35,15 @@ func StoreNodegraphMetric(event plugin_api.TCPEvent) {
 		float64(event.TxB),
 		float64(event.RxB),
 		float64(event.DeltaUs))
+}
+
+func sendPrometheusMetrics(event plugin_api.TCPEvent, persistent bool) {
+	hideSrcPort, _ := strconv.ParseBool(os.Getenv("K8S_PACKET_TCP_METRICS_HIDE_SRC_PORT"))
+	var srcPortMetrics = strconv.Itoa(int(event.Client.Port))
+	if hideSrcPort {
+		srcPortMetrics = "dynamic"
+	}
+	prometheus.K8sPacketBytesSentMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.TxB))
+	prometheus.K8sPacketBytesReceivedMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.RxB))
+	prometheus.K8sPacketDurationSecondsMetric.WithLabelValues(event.Client.Namespace, event.Client.Addr, event.Client.Name, srcPortMetrics, event.Server.Addr, event.Server.Name, strconv.Itoa(int(event.Server.Port)), strconv.FormatBool(persistent)).Observe(float64(event.DeltaUs))
 }

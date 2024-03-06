@@ -2,6 +2,8 @@ package prometheus
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"os"
+	"strconv"
 )
 
 var (
@@ -30,7 +32,10 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(K8sPacketTLSRecordMetric)
-	prometheus.MustRegister(K8sPacketTLSCertificateExpirationMetric)
-	prometheus.MustRegister(K8sPacketTLSCertificateExpirationCounterMetric)
+	sendTLSMetrics, _ := strconv.ParseBool(os.Getenv("K8S_PACKET_TLS_METRICS_ENABLED"))
+	if sendTLSMetrics {
+		prometheus.MustRegister(K8sPacketTLSRecordMetric)
+		prometheus.MustRegister(K8sPacketTLSCertificateExpirationMetric)
+		prometheus.MustRegister(K8sPacketTLSCertificateExpirationCounterMetric)
+	}
 }
