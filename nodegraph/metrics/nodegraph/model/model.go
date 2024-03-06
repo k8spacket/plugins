@@ -1,18 +1,21 @@
 package model
 
+import "time"
+
 type ConnectionItem struct {
-	Src            string  `json:"src"`
-	SrcName        string  `json:"srcName"`
-	SrcNamespace   string  `json:"srcNamespace"`
-	Dst            string  `json:"dst"`
-	DstName        string  `json:"dstName"`
-	DstNamespace   string  `json:"dstNamespace"`
-	ConnCount      int64   `json:"connCount"`
-	ConnPersistent int64   `json:"connPersistent"`
-	BytesSent      float64 `json:"bytesSent"`
-	BytesReceived  float64 `json:"bytesReceived"`
-	Duration       float64 `json:"duration"`
-	MaxDuration    float64 `json:"maxDuration"`
+	Src            string    `json:"src"`
+	SrcName        string    `json:"srcName"`
+	SrcNamespace   string    `json:"srcNamespace"`
+	Dst            string    `json:"dst"`
+	DstName        string    `json:"dstName"`
+	DstNamespace   string    `json:"dstNamespace"`
+	ConnCount      int64     `json:"connCount"`
+	ConnPersistent int64     `json:"connPersistent"`
+	BytesSent      float64   `json:"bytesSent"`
+	BytesReceived  float64   `json:"bytesReceived"`
+	Duration       float64   `json:"duration"`
+	MaxDuration    float64   `json:"maxDuration"`
+	LastSeen       time.Time `json:"lastSeen"`
 }
 
 type ConnectionEndpoint struct {

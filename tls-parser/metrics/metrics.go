@@ -13,6 +13,7 @@ import (
 	"github.com/k8spacket/plugins/tls-parser/metrics/model"
 	"github.com/k8spacket/plugins/tls-parser/metrics/prometheus"
 	"strconv"
+	"time"
 )
 
 func StoreTLSMetrics(tlsEvent plugin_api.TLSEvent) {
@@ -25,7 +26,8 @@ func StoreTLSMetrics(tlsEvent plugin_api.TLSEvent) {
 		DstPort:         tlsEvent.Server.Port,
 		Domain:          tlsEvent.ServerName,
 		UsedTLSVersion:  dict.ParseTLSVersion(tlsEvent.UsedTlsVersion),
-		UsedCipherSuite: dict.ParseCipherSuite(tlsEvent.UsedCipher)}
+		UsedCipherSuite: dict.ParseCipherSuite(tlsEvent.UsedCipher),
+		LastSeen:        time.Now()}
 
 	tlsDetails := model.TLSDetails{
 		Domain:          tlsEvent.ServerName,

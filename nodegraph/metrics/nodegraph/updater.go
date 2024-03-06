@@ -7,6 +7,7 @@ import (
 	"github.com/k8spacket/plugins/nodegraph/metrics/nodegraph/model"
 	"strconv"
 	"sync"
+	"time"
 )
 
 var connectionItemsMutex = sync.RWMutex{}
@@ -32,6 +33,7 @@ func UpdateNodeGraph(src string, srcName string, srcNamespace string, dst string
 	if duration > connection.MaxDuration {
 		connection.MaxDuration = duration
 	}
+	connection.LastSeen = time.Now()
 	tcp_connection_db.Set(id, &connection)
 	connectionItemsMutex.Unlock()
 }
