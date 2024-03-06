@@ -45,6 +45,21 @@ func StoreTLSMetrics(tlsEvent plugin_api.TLSEvent) {
 
 	storeInDatabase(&tlsConnection, &tlsDetails)
 
+	sendPrometheusMetrics(tlsConnection, tlsDetails)
+
+	var j, _ = json.Marshal(tlsConnection)
+	tls_parser_log.LOGGER.Println("TLS Record:", string(j))
+}
+
+func storeInDatabase(tlsConnection *model.TLSConnection, tlsDetails *model.TLSDetails) {
+	var id = strconv.Itoa(int(idb.HashId(fmt.Sprintf("%s-%s", tlsConnection.Src, tlsConnection.Dst))))
+	tlsConnection.Id = id
+	tls_connection_db.Upsert(id, tlsConnection)
+	tlsDetails.Id = id
+	tls_detail_db.Upsert(id, tlsDetails, certificate.UpdateCertificateInfo)
+}
+
+func sendPrometheusMetrics(tlsConnection model.TLSConnection, tlsDetails model.TLSDetails) {
 	prometheus.K8sPacketTLSRecordMetric.WithLabelValues(
 		tlsConnection.SrcNamespace,
 		tlsConnection.Src,
@@ -60,15 +75,4 @@ func StoreTLSMetrics(tlsEvent plugin_api.TLSEvent) {
 		tlsDetails.Dst,
 		strconv.Itoa(int(tlsDetails.Port)),
 		tlsDetails.Domain).Add(1)
-
-	var j, _ = json.Marshal(tlsConnection)
-	tls_parser_log.LOGGER.Println("TLS Record:", string(j))
-}
-
-func storeInDatabase(tlsConnection *model.TLSConnection, tlsDetails *model.TLSDetails) {
-	var id = strconv.Itoa(int(idb.HashId(fmt.Sprintf("%s-%s", tlsConnection.Src, tlsConnection.Dst))))
-	tlsConnection.Id = id
-	tls_connection_db.Upsert(id, tlsConnection)
-	tlsDetails.Id = id
-	tls_detail_db.Upsert(id, tlsDetails, certificate.UpdateCertificateInfo)
 }
