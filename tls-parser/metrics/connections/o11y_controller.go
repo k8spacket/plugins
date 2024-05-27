@@ -39,7 +39,7 @@ func TLSParserConnectionDetailsHandler(w http.ResponseWriter, req *http.Request)
 }
 
 func buildResponse[T model.TLSDetails | []model.TLSConnection](w http.ResponseWriter, url string, t T, resultFunc func(d T, s T) T) {
-	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
+	var k8spacketIps = k8s.GetPodIPsBySelectors(os.Getenv("K8S_PACKET_API_FIELD_SELECTOR"), os.Getenv("K8S_PACKET_API_LABEL_SELECTOR"))
 
 	var in T
 	out := t
