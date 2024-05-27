@@ -45,7 +45,7 @@ func NodeGraphFieldsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func NodeGraphDataHandler(w http.ResponseWriter, r *http.Request) {
-	var k8spacketIps = k8s.GetPodIPsByLabel("name", os.Getenv("K8S_PACKET_NAME_LABEL_VALUE"))
+	var k8spacketIps = k8s.GetPodIPsBySelectors(os.Getenv("K8S_PACKET_API_FIELD_SELECTOR"), os.Getenv("K8S_PACKET_API_LABEL_SELECTOR"))
 
 	var in []model.ConnectionItem
 	var connectionItems = make(map[string]model.ConnectionItem)
